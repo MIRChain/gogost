@@ -85,6 +85,23 @@ func TestRFCVectors(t *testing.T) {
 	if err != nil || !valid {
 		t.FailNow()
 	}
+	pubKey, err := prv.PublicKey()
+	if err != nil {
+		t.FailNow()
+	}
+	recovPubX, recovPubY, err := pubKey.Ecrecover(digest, signature)
+	pointSize := pubKey.C.PointSize()
+	raw := append(
+		pad(recovPubY.Bytes(), pointSize),
+		pad(recovPubX.Bytes(), pointSize)...,
+	)
+	reverse(raw)
+	if err != nil {
+		t.FailNow()
+	}
+	if bytes.Compare(pubKey.Raw(), raw) != 0 {
+		t.FailNow()
+	}
 }
 
 func TestRandom2001(t *testing.T) {
