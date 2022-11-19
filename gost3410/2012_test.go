@@ -72,18 +72,20 @@ func TestStdVector1(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	t.Logf("PubX , %x", pubKey.X.String())
-	t.Logf("PubY , %x", pubKey.Y.String())
+
 	recovPubX, recovPubY, err := pubKey.Ecrecover(dgst, sign)
-	t.Logf("PubX recovered, %x", recovPubX.String())
-	t.Logf("PubY recovered, %x", recovPubY.String())
+	pointSize := pubKey.C.PointSize()
+	raw := append(
+		pad(recovPubY.Bytes(), pointSize),
+		pad(recovPubX.Bytes(), pointSize)...,
+	)
+	reverse(raw)
 	if err != nil {
 		t.FailNow()
 	}
-	pubKey.Raw()
-	// if bytes.Compare(pubKey.Raw(), recovPub) != 0 {
-	// 	t.FailNow()
-	// }
+	if bytes.Compare(pubKey.Raw(), raw) != 0 {
+		t.FailNow()
+	}
 }
 
 // Test vector from GOST R 34.10-2012 appendix
