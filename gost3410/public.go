@@ -116,3 +116,73 @@ func (our *PublicKey) Equal(theirKey crypto.PublicKey) bool {
 	}
 	return our.X.Cmp(their.X) == 0 && our.Y.Cmp(their.Y) == 0 && our.C.Equal(their.C)
 }
+
+func (pub *PublicKey) Ecrecover(digest, signature []byte) (*big.Int, *big.Int, error) {
+	// var res []byte
+	pointSize := pub.C.PointSize()
+	if len(signature) != 2*pointSize {
+		return nil, nil, fmt.Errorf("gogost/gost3410: len(signature) != %d", 2*pointSize)
+	}
+	r := bytes2big(signature[pointSize:])
+	s := bytes2big(signature[:pointSize])
+
+	if r.Cmp(zero) <= 0 ||
+		r.Cmp(pub.C.Q) >= 0 ||
+		s.Cmp(zero) <= 0 ||
+		s.Cmp(pub.C.Q) >= 0 {
+		return nil, nil, fmt.Errorf("error at r")
+	}
+	z := bytes2big(digest)
+	z.Mod(z, pub.C.Q)
+	if z.Cmp(zero) == 0 {
+		z = big.NewInt(1)
+	}
+	var Rx,Ry, w, u1, u2 = new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+	x3 := new(big.Int).Mul(r, r)
+	x3.Mul(x3, r)
+	aX := new(big.Int).Mul(pub.C.A, r)
+	x3.Add(x3, aX)
+	x3.Add(x3, pub.C.B)
+	x3.Mod(x3, pub.C.P)
+	y0 := new(big.Int).ModSqrt(x3, pub.C.P)
+	if y0.Cmp(big.NewInt(0)) == 0 {
+		return nil, nil, fmt.Errorf("error at computing y0")
+	}
+
+	y1 := new(big.Int).Sub(pub.C.P, y0)
+	
+	Rx.Set(r)
+	Ry.Set(y0)
+	
+	w.ModInverse(r, pub.C.Q)
+	
+	u1.Mul(s, w)
+	u1.Mod(u1, pub.C.Q)
+
+	u2.Mul(z, w)
+	u2.Neg(u2)
+	u2.Mod(u2, pub.C.Q)
+
+	u1Gx, u1Gy, err := pub.C.Exp(u1, pub.C.X, pub.C.Y)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error at computing u1Gx, u1Gy")
+	}
+	u2Rx, u2Ry, err := pub.C.Exp(u2, Rx, Ry)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error at computing u2Rx, u2Ry")
+	}
+	Qx, Qy := pub.C.Add(u1Gx, u1Gy, u2Rx, u2Ry)
+	if Qx.Cmp(pub.X) == 0 && Qy.Cmp(pub.Y) == 0 {
+			return Qx, Qy, nil
+		} 
+			
+	u2Rx_, u2Ry_, err :=  pub.C.Exp(Rx, y1, u2)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error at computing u2Rx_, u2Ry_")
+	}
+	Qx, Qy = pub.C.Add(u1Gx, u1Gy, u2Rx_, u2Ry_)
+	if Qx.Cmp(pub.X) == 0 && Qy.Cmp(pub.Y) == 0 {
+		return Qx, Qy, nil
+	}
+	return nil, nil, fmt.Errorf("cant recover public key")
+}

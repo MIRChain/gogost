@@ -98,8 +98,8 @@ func (c *Curve) pos(v *big.Int) {
 	}
 }
 
-func (c *Curve) add(p1x, p1y, p2x, p2y *big.Int) {
-	var t, tx, ty big.Int
+func (c *Curve) Add(p1x, p1y, p2x, p2y *big.Int) (*big.Int, *big.Int) {
+	var t, tx, ty, X, Y big.Int
 	if p1x.Cmp(p2x) == 0 && p1y.Cmp(p2y) == 0 {
 		// double
 		t.Mul(p1x, p1x)
@@ -130,8 +130,9 @@ func (c *Curve) add(p1x, p1y, p2x, p2y *big.Int) {
 	ty.Sub(&ty, p1y)
 	ty.Mod(&ty, c.P)
 	c.pos(&ty)
-	p1x.Set(&tx)
-	p1y.Set(&ty)
+	X.Set(&tx)
+	Y.Set(&ty)
+	return &X, &Y
 }
 
 func (c *Curve) Exp(degree, xS, yS *big.Int) (*big.Int, *big.Int, error) {
@@ -145,10 +146,10 @@ func (c *Curve) Exp(degree, xS, yS *big.Int) (*big.Int, *big.Int, error) {
 	cy := big.NewInt(0).Set(yS)
 	for dg.Cmp(zero) != 0 {
 		if dg.Bit(0) == 1 {
-			c.add(tx, ty, cx, cy)
+			tx, ty = c.Add(tx, ty, cx, cy)
 		}
 		dg.Rsh(dg, 1)
-		c.add(cx, cy, cx, cy)
+		cx, cy = c.Add(cx, cy, cx, cy)
 	}
 	return tx, ty, nil
 }
